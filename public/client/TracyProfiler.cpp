@@ -1209,6 +1209,9 @@ void Profiler::EndSamplingProfiling()
 #endif
 }
 
+#ifndef TRACY_SERIAL_QUEUE_PREALLOC
+#  define TRACY_SERIAL_QUEUE_PREALLOC ( 1024*1024 )
+#endif
 constexpr size_t QueuePrealloc = 256 * 1024;
 
 TRACY_API int64_t GetFrequencyQpc()
@@ -1532,8 +1535,8 @@ Profiler::Profiler()
     , m_bufferOffset( 0 )
     , m_bufferStart( 0 )
     , m_lz4Buf( (char*)tracy_malloc( LZ4Size + sizeof( lz4sz_t ) ) )
-    , m_serialQueue( 1024*1024 )
-    , m_serialDequeue( 1024*1024 )
+    , m_serialQueue( TRACY_SERIAL_QUEUE_PREALLOC )
+    , m_serialDequeue( TRACY_SERIAL_QUEUE_PREALLOC )
 #ifndef TRACY_NO_FRAME_IMAGE
     , m_fiQueue( 16 )
     , m_fiDequeue( 16 )
@@ -3967,6 +3970,20 @@ bool Profiler::HandleServerQuery()
     case ServerQueryExternalName:
         QueueExternalName( ptr );
         break;
+#endif
+#if !defined TRACY_HAS_SYSTEM_TRACING && defined TRACY_PLATFORM_EXTERNAL_NAME
+    case ServerQueryExternalName:
+    {
+        // Context switches supplied by the platform name threads the client
+        // may never have seen. The server waits for both strings of every
+        // query before a capture can finish.
+        char threadName[64];
+        char processName[64];
+        TRACY_PLATFORM_EXTERNAL_NAME( ptr, threadName, processName, sizeof( threadName ) );
+        SendString( ptr, threadName, QueueType::ExternalThreadName );
+        SendString( ptr, processName, QueueType::ExternalName );
+        break;
+    }
 #endif
     case ServerQueryParameter:
         HandleParameter( ptr );

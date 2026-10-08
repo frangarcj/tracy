@@ -330,7 +330,9 @@ public:
 #endif
 
 #if !defined TRACY_HW_TIMER || defined TRACY_TIMER_FALLBACK
-#  if defined __linux__ && defined CLOCK_MONOTONIC_RAW
+#  if defined TRACY_PLATFORM_GET_TIME
+        return TRACY_PLATFORM_GET_TIME();
+#  elif defined __linux__ && defined CLOCK_MONOTONIC_RAW
         struct timespec ts;
         clock_gettime( CLOCK_MONOTONIC_RAW, &ts );
         return int64_t( ts.tv_sec ) * 1000000000ll + int64_t( ts.tv_nsec );
@@ -500,7 +502,7 @@ public:
 
         auto ptr = (char*)tracy_malloc( txtLength );
         memcpy( ptr, txt, txtLength );
-        TaggedUserlandAddress taggedPtr{ (uint64_t)ptr, MakeMessageMetadata( source, severity ) };
+        TaggedUserlandAddress taggedPtr{ (uint64_t)(uintptr_t)ptr, MakeMessageMetadata( source, severity ) };
 
         if( color != 0 )
         {
@@ -533,7 +535,7 @@ public:
             tracy::GetProfiler().SendCallstack( callstack_depth );
         }
 
-        TaggedUserlandAddress taggedPtr{ (uint64_t)txt, MakeMessageMetadata( source, severity ) };
+        TaggedUserlandAddress taggedPtr{ (uint64_t)(uintptr_t)txt, MakeMessageMetadata( source, severity ) };
 
         if( color != 0 )
         {
@@ -560,7 +562,7 @@ public:
         TRACY_ASSERT( size < (std::numeric_limits<uint16_t>::max)() );
         auto ptr = (char*)tracy_malloc( size );
         memcpy( ptr, txt, size );
-        TaggedUserlandAddress taggedPtr{ (uint64_t)ptr, MakeMessageMetadata( MessageSourceType::User, MessageSeverity::Info ) };
+        TaggedUserlandAddress taggedPtr{ (uint64_t)(uintptr_t)ptr, MakeMessageMetadata( MessageSourceType::User, MessageSeverity::Info ) };
 
         TracyLfqPrepare( QueueType::MessageAppInfo );
         MemWrite( &item->messageFat.time, GetTime() );
